@@ -1,0 +1,88 @@
+##################################################
+# Install Kubenetes Master
+##################################################
+- name: Prepare dependencies
+  include_tasks: deps.yaml
+
+- name: Install Kubelet, Kubeadm, Kubectl
+  yum:
+    name: "{{ packages }}"
+  vars:
+    packages:
+      - kubelet-{{kubernetes_version}}
+      - kubeadm-{{kubernetes_version}}
+      - kubectl-{{kubernetes_version}}
+
+- name: Enable and Run Kubelet
+  systemd:
+    name: kubelet
+    enabled: yes
+    state: started
+
+# - name: Enable firewall port for kubernetes
+#   firewalld:
+#     port: "{{ item }}"
+#     permanent: yes
+#     immediate: yes
+#     state: enabled
+#   loop:
+#     - 6443/tcp
+#     - 10250/tcp
+#     - 10251/tcp
+#     - 10252/tcp
+#     - 10255/tcp
+#     - 2379/tcp
+#     - 2380/tcp
+#     - 4789/udp
+#     - 5437/tcp
+#     - 179/tcp
+
+# - name: Reset Kubernetes cluster
+#   shell: |
+#     kubeadm reset --force
+#   register: reset_cluster
+#   tags:
+#     - kubereset
+
+- name: Check if kubeadm has already run
+  stat:
+    path: "/etc/kubernetes/pki/ca.key"
+  register: kubeadm_ca
+  tags:
+    - kubeinit
+
+- name: Init Kubernetes cluster
+  shell: |
+    kubeadm init --kubernetes-version {{ kubernetes_version }} \
+                --service-cidr {{ network_service_cidr }} \
+                --pod-network-cidr {{ network_pod_cidr }} \
+                --token {{ kube_master_token }} \
+                --control-plane-endpoint {{ kube_lb_internal }} \
+                --apiserver-cert-extra-sans {{ inventory_hostname }},{{ kube_lb_internal }},kubernetes.alinamed.lokal \
+                --upload-certs \
+                --ignore-preflight-errors all >> /root/cluster.txt
+  when: not kubeadm_ca.stat.exists
+  register: init_cluster
+  tags:
+    - kubeinit
+
+- name: Create a directory .kube
+  file:
+    path: ~/.kube
+    state: directory
+    mode: '0755'
+
+- name: Copy kubeconfig
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: ~/.kube/config
+    remote_src: yes
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Copy .kube/config to local
+  fetch:
+    src: /root/.kube/config
+    dest: ~/.kube/config
+    flat: yes

@@ -1,0 +1,10 @@
+##################################################
+# Configure Common Setting
+##################################################
+
+- name: Setup
+  setup:
+
+- name: Kubernetes master ip address
+  debug:
+    msg: "{{ hostvars['master_worker_host']['master_join_command'] }}"

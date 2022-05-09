@@ -1,0 +1,59 @@
+##################################################
+# Install Kubenetes Cluster
+# 1 Master 1 Worker
+##################################################
+---
+- hosts: server
+  become: true
+  roles:
+    - common_server
+  tags:
+    - server
+
+- hosts: kubernetes_cluster
+  become: true
+  roles:
+    - common_kubernetes
+    - docker
+  tags:
+    - docker
+
+- hosts: master
+  become: true
+  roles:
+    - kubernetes/master
+    - cni/calico
+    # - role: helm
+    #   tags: role-helm
+  tags:
+    - kubernetes
+    - kubemaster
+
+- hosts: worker
+  become: true
+  roles:
+    - kubernetes/worker
+  pre_tasks:
+    - name: Gather facts from kubernetes master
+      setup:
+      delegate_facts: True
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups['master'] }}"
+  tags:
+    - kubernetes
+    - kubeworker
+
+- hosts: nfs_server
+  become: true
+  roles:
+    - nfs-server
+  tags:
+    - nfs
+
+- hosts: docker
+  become: true
+  roles:
+    - common_server
+    - docker
+  tags:
+    - docker

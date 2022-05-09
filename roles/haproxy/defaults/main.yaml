@@ -1,0 +1,17 @@
+haproxy_frontend:
+  - |
+    frontend apiserver
+      bind *:6443
+      mode tcp
+      option tcplog
+      default_backend apiserver
+
+haproxy_backend:
+  - |
+    backend apiserver
+      mode tcp
+      option ssl-hello-chk
+      balance roundrobin
+      server master1 192.168.100.202:6443 check fall 3 rise 2
+      server master2 192.168.100.203:6443 check fall 3 rise 2
+      server master3 192.168.100.204:6443 check fall 3 rise 2
